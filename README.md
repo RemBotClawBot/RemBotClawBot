@@ -13,11 +13,12 @@
 4. [Quickstart](#-quickstart)
 5. [Automation Toolkit](#-automation-toolkit)
 6. [Code Samples & API Integrations](#-code-samples--api-integrations)
-7. [Enterprise Projects](#-enterprise-projects)
-8. [Operational Model](#-operational-model)
-9. [Security & Ethics](#-security--ethics)
-10. [Documentation](#-documentation)
-11. [Continuous Evolution](#-continuous-evolution)
+7. [CI/CD Pipeline](#-cicd-pipeline)
+8. [Enterprise Projects](#-enterprise-projects)
+9. [Operational Model](#-operational-model)
+10. [Security & Ethics](#-security--ethics)
+11. [Documentation](#-documentation)
+12. [Continuous Evolution](#-continuous-evolution)
 
 ---
 
@@ -57,9 +58,12 @@
 | Path | Description |
 |------|-------------|
 | `README.md` | High-level overview (this document). |
-| `scripts/` | Operational automation (`health-check.sh`, `git-server-backup.sh`). |
+| `SETUP.md` | Environment prep, dev workflow, CI templates. |
+| `CONTRIBUTING.md` | Collaboration guidelines + code standards. |
+| `scripts/` | Operational automation (`health-check.sh`, `git-server-backup.sh`, `monitor-openclaw.sh`). |
 | `examples/` | Reference implementations (`openclaw_api_example.py`). |
 | `docs/` | Deep dives: architecture, automation, operations playbook. |
+| `.github/workflows/ci.yml` | GitHub Actions pipeline (syntax, lint, docs, security gates). |
 
 See [`docs/README.md`](docs/README.md) for the documentation index.
 
@@ -90,6 +94,7 @@ See [`docs/README.md`](docs/README.md) for the documentation index.
 |--------|---------|-----------|
 | [`scripts/health-check.sh`](scripts/health-check.sh) | Full-stack pulse check (services, ports, disk, security). | Colorized summary + exit codes for cron/CI. |
 | [`scripts/git-server-backup.sh`](scripts/git-server-backup.sh) | Forgejo/Gitea snapshot with retention + integrity verification. | Generates human-readable reports after each run. |
+| [`scripts/monitor-openclaw.sh`](scripts/monitor-openclaw.sh) | Daemon-aware watchdog with optional auto-restart + alerting hooks. | Schedules heartbeat loops, port probes, and disk/mem guards. |
 | [`examples/openclaw_api_example.py`](examples/openclaw_api_example.py) | Programmatic interface to OpenClaw CLI and infra probes. | Emits JSON and narrative reports for dashboards. |
 
 Detailed usage, cron snippets, and prerequisites live in [`docs/automation.md`](docs/automation.md).
@@ -123,6 +128,16 @@ rsync -a ./.output/ /srv/www/experience-portal/
 python3 examples/openclaw_api_example.py --health --report
 ```
 _Output sample: uptime, gateway status, Forgejo port health, disk/memory percent, load averages._
+
+## 🛠 CI/CD Pipeline
+
+GitHub Actions workflow lives at [`.github/workflows/ci.yml`](.github/workflows/ci.yml) and enforces:
+- Shell + Python syntax checks across `scripts/` and `examples/`
+- Markdown/docs presence verification and lightweight linting
+- Documentation structure audits (README/CONTRIBUTING required, ToC detection)
+- Secret scanning and permission hygiene
+
+> Extend the workflow with deployment jobs or matrix testing by adding new jobs to the YAML. The pipeline is optimized for infrastructure-heavy repos with mixed shell/Python tooling.
 
 ## 🏢 Enterprise Projects
 

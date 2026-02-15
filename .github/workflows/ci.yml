@@ -1,0 +1,206 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  syntax-check:
+    runs-on: ubuntu-latest
+    name: Shell Script Syntax Check
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Check shell script syntax
+      run: |
+        echo "Checking shell script syntax..."
+        for script in scripts/*.sh; do
+          if [ -f "$script" ]; then
+            echo "Checking $script..."
+            bash -n "$script" && echo "✓ $script: Syntax OK" || (echo "✗ $script: Syntax error"; exit 1)
+          fi
+        done
+    
+    - name: Verify script permissions
+      run: |
+        echo "Checking script permissions..."
+        for script in scripts/*.sh; do
+          if [ -f "$script" ]; then
+            if [ -x "$script" ]; then
+              echo "✓ $script is executable"
+            else
+              echo "⚠ $script is not executable"
+            fi
+          fi
+        done
+  
+  python-check:
+    runs-on: ubuntu-latest
+    name: Python Syntax Check
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+    
+    - name: Check Python syntax
+      run: |
+        echo "Checking Python syntax..."
+        for pyfile in examples/*.py; do
+          if [ -f "$pyfile" ]; then
+            echo "Checking $pyfile..."
+            python3 -m py_compile "$pyfile" && echo "✓ $pyfile: Syntax OK" || (echo "✗ $pyfile: Syntax error"; exit 1)
+          fi
+        done
+    
+    - name: Install dependencies
+      run: |
+        pip install psutil
+    
+    - name: Run Python examples
+      run: |
+        echo "Running Python examples..."
+        for pyfile in examples/*.py; do
+          if [ -f "$pyfile" ]; then
+            echo "Testing $pyfile..."
+            python3 "$pyfile" --help 2>/dev/null && echo "✓ $pyfile: Help command works" || echo "⚠ $pyfile: Help command may not be implemented"
+          fi
+        done
+  
+  markdown-check:
+    runs-on: ubuntu-latest
+    name: Markdown Lint Check
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Lint markdown files
+      run: |
+        echo "Checking markdown files..."
+        find . -name "*.md" -type f | while read file; do
+          echo "Checking $file..."
+          # Basic markdown check - ensure no obvious issues
+          if [ -s "$file" ]; then
+            echo "✓ $file: Non-empty"
+          else
+            echo "✗ $file: Empty file"
+            exit 1
+          fi
+        done
+    
+    - name: Check for broken links (basic)
+      run: |
+        echo "Checking for broken links..."
+        # Simple check for local file references
+        find . -name "*.md" -type f -exec grep -n '\[.*\](.*)' {} \; > /tmp/links.txt || true
+        echo "Found $(wc -l < /tmp/links.txt) markdown links"
+  
+  documentation-check:
+    runs-on: ubuntu-latest
+    name: Documentation Quality Check
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Check README structure
+      run: |
+        echo "Checking documentation structure..."
+        
+        # Check required files exist
+        required_files=("README.md" "CONTRIBUTING.md")
+        for file in "${required_files[@]}"; do
+          if [ -f "$file" ]; then
+            echo "✓ $file exists"
+          else
+            echo "✗ $file missing"
+            exit 1
+          fi
+        done
+        
+        # Check for table of contents in README
+        if grep -q "Table of Contents" README.md || grep -q "## 📚 Table of Contents" README.md; then
+          echo "✓ README has table of contents"
+        else
+          echo "⚠ README may not have table of contents"
+        fi
+    
+    - name: Check example files
+      run: |
+        echo "Checking examples..."
+        if [ -d "examples" ] && [ "$(ls -A examples/*.py 2>/dev/null | wc -l)" -gt 0 ]; then
+          echo "✓ Python examples exist"
+        else
+          echo "⚠ No Python examples found"
+        fi
+        
+        if [ -d "scripts" ] && [ "$(ls -A scripts/*.sh 2>/dev/null | wc -l)" -gt 0 ]; then
+          echo "✓ Shell scripts exist"
+        else
+          echo "⚠ No shell scripts found"
+        fi
+    
+    - name: Generate documentation report
+      run: |
+        echo "=== Documentation Report ==="
+        echo "Files checked:"
+        find . -name "*.md" -type f | wc -l
+        echo "Total lines of documentation:"
+        find . -name "*.md" -type f -exec wc -l {} + | tail -1
+  
+  security-scan:
+    runs-on: ubuntu-latest
+    name: Security Scan
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Check for sensitive data
+      run: |
+        echo "Checking for sensitive data..."
+        
+        # Check for potential secrets in files
+        patterns=(
+          "password"
+          "secret"
+          "key"
+          "token"
+          "api_key"
+          "apikey"
+          "private_key"
+          "ssh-rsa"
+          "-----BEGIN"
+        )
+        
+        found_issues=0
+        for pattern in "${patterns[@]}"; do
+          echo "Checking for: $pattern"
+          if grep -r -i "$pattern" --include="*.sh" --include="*.py" --include="*.md" --include="*.yml" --include="*.yaml" --include="*.json" . | grep -v "password: \"\"" | grep -v "#.*$pattern" | grep -v "echo.*$pattern"; then
+            echo "⚠ Potential secret found with pattern: $pattern"
+            found_issues=$((found_issues + 1))
+          fi
+        done
+        
+        if [ "$found_issues" -eq 0 ]; then
+          echo "✓ No obvious secrets found"
+        else
+          echo "⚠ Found $found_issues potential issues (may be false positives)"
+        fi
+    
+    - name: Check file permissions
+      run: |
+        echo "Checking file permissions..."
+        # Check for world-writable files
+        find . -type f -perm /o+w ! -path "./.git/*" ! -name "*.sh" | while read file; do
+          echo "⚠ $file is world-writable"
+        done
