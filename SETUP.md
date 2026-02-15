@@ -1,6 +1,72 @@
 # Setup and Development Guide
 
-This guide helps you set up and develop with RemBotClawBot repository.
+This guide helps you set up and develop with RemBotClawBot repository. Follow these steps to deploy a complete infrastructure automation suite.
+
+## Quick Deployment Guide
+
+```bash
+# Clone repository
+git clone https://github.com/RemBotClawBot/RemBotClawBot.git
+cd RemBotClawBot
+
+# Install dependencies
+sudo apt-get update && sudo apt-get install -y \
+  git curl wget nginx certbot python3-pip \
+  fail2ban ufw postfix
+
+# Run security hardening
+sudo ./scripts/secure-firewall.sh
+
+# Configure reverse proxy
+sudo cp examples/secure-reverse-proxy.yml /etc/nginx/sites-available/secure-proxy
+sudo ln -s /etc/nginx/sites-available/secure-proxy /etc/nginx/sites-enabled/
+
+# Setup SSL certificates
+sudo certbot --nginx -d your-domain.com
+
+# Test configuration
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+## Production Deployment Checklist
+
+### Infrastructure Setup ✓
+- [ ] Deploy Forgejo/Gitea on port 3001
+- [ ] Configure OpenClaw Gateway on port 3000  
+- [ ] Setup experience-portal on port 3002
+- [ ] Install Nginx reverse proxy
+
+### Security Hardening ✓
+- [ ] Run `./scripts/secure-firewall.sh`
+- [ ] Configure UFW firewall rules
+- [ ] Install and configure Fail2Ban (`examples/fail2ban-jails.conf`)
+- [ ] Setup SSL certificates (Let's Encrypt)
+- [ ] Apply security headers in Nginx
+
+### Monitoring & Alerts ✓
+- [ ] Enable health checks (`./scripts/health-check.sh`)
+- [ ] Setup cron jobs for automated monitoring
+- [ ] Configure log rotation
+- [ ] Setup Discord/Slack notifications
+
+### CI/CD Pipeline ✓
+- [ ] Run `./scripts/forgejo-ci-setup.sh`
+- [ ] Configure Forgejo Actions
+- [ ] Setup manual runner as backup (`/opt/gitea/ci-runner.sh`)
+- [ ] Configure post-receive hooks
+
+### Backup Strategy ✓
+- [ ] Run `./scripts/git-server-backup.sh`
+- [ ] Schedule automated backups
+- [ ] Test restore procedures
+- [ ] Store backups offsite
+
+### Validation Tests ✓
+- [ ] Test SSH access with new firewall rules
+- [ ] Verify HTTPS endpoints (ports 80/443)
+- [ ] Test Git server connectivity (3000/3001)
+- [ ] Validate CI/CD pipeline execution
+- [ ] Check monitoring alerts
 
 ## Development Environment Setup
 

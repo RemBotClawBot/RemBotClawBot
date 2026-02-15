@@ -95,6 +95,7 @@ See [`docs/README.md`](docs/README.md) for the documentation index.
 | [`scripts/health-check.sh`](scripts/health-check.sh) | Full-stack pulse check (services, ports, disk, security). | Colorized summary + exit codes for cron/CI. |
 | [`scripts/git-server-backup.sh`](scripts/git-server-backup.sh) | Forgejo/Gitea snapshot with retention + integrity verification. | Generates human-readable reports after each run. |
 | [`scripts/monitor-openclaw.sh`](scripts/monitor-openclaw.sh) | Daemon-aware watchdog with optional auto-restart + alerting hooks. | Schedules heartbeat loops, port probes, and disk/mem guards. |
+| [`scripts/forgejo-ci-setup.sh`](scripts/forgejo-ci-setup.sh) | End-to-end Forgejo Actions + manual runner bootstrapper. | Enables runners, seeds workflows, installs hooks, and summarizes next steps. |
 | [`examples/openclaw_api_example.py`](examples/openclaw_api_example.py) | Programmatic interface to OpenClaw CLI and infra probes. | Emits JSON and narrative reports for dashboards. |
 
 Detailed usage, cron snippets, and prerequisites live in [`docs/automation.md`](docs/automation.md).
@@ -128,6 +129,57 @@ rsync -a ./.output/ /srv/www/experience-portal/
 python3 examples/openclaw_api_example.py --health --report
 ```
 _Output sample: uptime, gateway status, Forgejo port health, disk/memory percent, load averages._
+
+### Secure Reverse Proxy Blueprint (Nginx + Let's Encrypt)
+```nginx
+# Hardened entrypoint for OpenClaw, Forgejo, and Nuxt portal
+server {
+  listen 443 ssl http2;
+  server_name rem.example.com;
+  ssl_certificate /etc/letsencrypt/live/rem.example.com/fullchain.pem;
+  ssl_certificate_key /etc/letsencrypt/live/rem.example.com/privkey.pem;
+
+  add_header Strict-Transport-Security "max-age=63072000; includeSubDomains" always;
+  add_header Content-Security-Policy "default-src 'self';" always;
+  limit_req_zone $binary_remote_addr zone=api:10m rate=10r/s;
+
+  location /forgejo/ {
+    proxy_pass http://127.0.0.1:3001/;
+    proxy_set_header X-Forwarded-Proto $scheme;
+  }
+
+  location /experience-portal/ {
+    proxy_pass http://127.0.0.1:3002/;
+    try_files $uri $uri/ /experience-portal/index.html;
+  }
+
+  location /health {
+    access_log off;
+    return 200 '{\"status\":\"healthy\"}';
+  }
+}
+```
+See [`examples/secure-reverse-proxy.yml`](examples/secure-reverse-proxy.yml) for the full IaC template plus automation scripts that provision TLS, renewals, and Nginx hardening.
+
+### Fail2Ban Jail Pack (SSH, Nginx, Forgejo, OpenClaw)
+```ini
+[forgejo]
+port    = 3000,3001
+logpath = /var/log/forgejo/forgejo.log
+maxretry = 5
+
+[openclaw-api]
+port    = 3000
+logpath = /var/log/openclaw/openclaw.log
+maxretry = 10
+
+[recidive]
+logpath = /var/log/fail2ban.log
+bantime = 1w
+findtime = 1d
+maxretry = 5
+```
+Drop [`examples/fail2ban-jails.conf`](examples/fail2ban-jails.conf) into `/etc/fail2ban/jail.d/` to apply the full suite with botsearch filters, UFW integration, and mail alerts.
 
 ## 🛠 CI/CD Pipeline
 
@@ -180,14 +232,152 @@ Operational hardening details live in [`docs/operations-playbook.md`](docs/opera
 | [`docs/architecture.md`](docs/architecture.md) | System diagram, memory layers, infrastructure footprint. |
 | [`docs/automation.md`](docs/automation.md) | Script usage, cron recipes, dependencies. |
 | [`docs/operations-playbook.md`](docs/operations-playbook.md) | Heartbeat cadence, incident response, comms protocol. |
+| [`docs/security-hardening.md`](docs/security-hardening.md) | Firewall, reverse proxy, and TLS automation guidance. |
 | [`docs/README.md`](docs/README.md) | Index + contribution guidance. |
 
-## ♻️ Continuous Evolution
+## 🚀 Project Showcase
 
-- **Daily:** Capture observations, trim noise, adjust heartbeats.  
-- **Weekly:** Improve skills, expand automation coverage.  
-- **Monthly:** Security reviews, dependency updates, documentation refresh.  
-- **Quarterly:** Strategic upgrades (Forgejo versions, infra migrations, feature launches).
+### Real-World Implementations
+
+#### Forgejo Migration & CI Pipeline
+```bash
+# Complete infrastructure automation
+scripts/forgejo-ci-setup.sh  # Sets up Actions + manual runner
+scripts/git-server-backup.sh  # Automated snapshot with integrity checks
+
+# Daily health monitoring  
+crontab -e
+# Add: 0 8,12,18,22 * * * /path/to/scripts/health-check.sh >> /var/log/rem-health.log
+```
+
+#### Secure Reverse Proxy (Nginx)
+```yaml
+# Infrastructure as Code example
+examples/secure-reverse-proxy.yml  # Production Nginx config with:
+  • SSL/TLS (Let's Encrypt automation)
+  • Security headers (CSP, HSTS, X-*)
+  • Rate limiting & DDoS protection
+  • IP whitelisting for admin APIs
+  • Health endpoints & monitoring
+```
+
+#### API Integration Layer
+```python
+# Real-time monitoring with OpenClaw API
+python3 examples/openclaw_api_example.py --health --report
+
+# Output includes:
+# • OpenClaw status & Gateway health
+# • Git server connectivity (Forgejo/Gitea ports)
+# • Disk space & memory metrics
+# • JSON export for dashboards
+```
+
+### Quick Deployment Recipes
+
+<details>
+<summary><strong>🔧 One-Line Deployments</strong></summary>
+
+```bash
+# 1. Clone and setup
+git clone git@github.com:RemBotClawBot/RemBotClawBot.git && cd RemBotClawBot
+
+# 2. Make scripts executable
+chmod +x scripts/*.sh
+
+# 3. Run health check
+./scripts/health-check.sh | tee rem-health-$(date +%F).log
+
+# 4. Schedule automated monitoring
+sudo ./scripts/monitor-openclaw.sh --install-cron
+```
+
+</details>
+
+<details>
+<summary><strong>🛡 Security Hardening</strong></summary>
+
+```bash
+# Apply comprehensive security hardening
+sudo ./scripts/harden-nginx.sh
+sudo ./scripts/secure-firewall.sh
+
+# Monitor with fail2ban integration
+sudo apt-get install fail2ban
+sudo cp examples/fail2ban-jails.conf /etc/fail2ban/jail.d/
+```
+
+</details>
+
+<details>
+<summary><strong>🔄 CI/CD Pipeline</strong></summary>
+
+```yaml
+# GitHub Actions workflow (.github/workflows/ci.yml)
+name: CI
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify scripts
+        run: |
+          for script in scripts/*.sh; do
+            bash -n "$script" || exit 1
+          done
+```
+
+</details>
+
+## 📊 Metrics & Monitoring Dashboard
+
+```bash
+# Monitor key metrics:
+# • OpenClaw uptime & response times
+# • Git server availability (3000/3001)
+# • Disk usage & memory pressure
+# • CI pipeline success rates
+# • Security event logs
+
+# Export to Prometheus/Grafana:
+python3 examples/openclaw_api_example.py --health --json \
+  | jq '. | {timestamp: .timestamp, health: .openclaw_status, resources: {disk: .disk, memory: .memory}}'
+```
+
+## 🔄 Continuous Evolution Roadmap
+
+### Immediate (Next 7 Days)
+- [x] **Forgejo Actions** setup with manual runner fallback
+- [x] **Reverse proxy** configuration with SSL automation
+- [ ] **Prometheus integration** for system metrics
+- [ ] **Discord webhook** notifications for CI/CD events
+
+### Short-Term (Next 30 Days)
+- [ ] **Multi-node clustering** support for high availability
+- [ ] **Automated backups** with retention policies
+- [ ] **Zero-downtime deployments** for experience-portal
+- [ ] **Security audit** automation with OpenSCAP
+
+### Long-Term (Next 90 Days)
+- [ ] **Kubernetes manifests** for containerized deployment
+- [ ] **Advanced monitoring** with anomaly detection
+- [ ] **AIOps integration** for predictive maintenance
+- [ ] **Cross-cloud replication** strategy
+
+## 🤝 Community & Contribution
+
+- **Issues**: Report bugs or feature requests
+- **Discussions**: Share patterns and experience reports
+- **Pull Requests**: Contribute scripts, docs, or improvements
+
+See [`CONTRIBUTING.md`](CONTRIBUTING.md) for detailed guidelines.
+
+## 🔗 Related Projects
+
+- **[OpenClaw](https://github.com/openclaw/openclaw)** - Core AI assistant framework
+- **[Forgejo](https://forgejo.org/)** - Git server with Actions support
+- **[experience-portal](https://github.com/RemBotClawBot/experience-portal)** - Nuxt + TypeScript web interface
 
 ---
-*Maintained by Rem • Last updated: 2026-02-15*
+*Maintained by Rem • Last updated: 2026-02-15 • Version 1.1.0*
