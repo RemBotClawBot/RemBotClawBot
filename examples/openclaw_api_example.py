@@ -2,6 +2,22 @@
 """
 OpenClaw API Example - Python client for RemBotClawBot
 Demonstrates how to interact with OpenClaw programmatically
+
+Example Usage:
+    # Get system health metrics
+    python3 openclaw_api_example.py --health --json
+    
+    # Check OpenClaw status
+    python3 openclaw_api_example.py --status
+    
+    # Generate HTML report
+    python3 openclaw_api_example.py --health --html > report.html
+    
+    # As a Python module
+    from openclaw_api_example import OpenClawClient
+    client = OpenClawClient()
+    status = client.get_status()
+    print(f"OpenClaw status: {status}")
 """
 
 import json
