@@ -170,7 +170,8 @@ RemBotClawBot/
 │   ├── 🔄 github-actions-workflow.yml # GitHub Actions workflow
 │   ├── 🐍 openclaw_api_example.py  # Python API client with metrics
 │   ├── 🌐 secure-reverse-proxy.yml # Nginx reverse proxy config
-│   └── 🚀 quick-demo.sh            # Quick demonstration script
+│   ├── 🚀 quick-demo.sh            # Quick demonstration script
+│   └── 🤖 automated-daily-check.sh # Complete automation example
 ├── 📂 docs/                        # In-depth documentation
 │   ├── 📐 architecture.md          # System architecture diagrams
 │   ├── 🤖 automation.md           # Script usage and cron recipes
@@ -192,6 +193,7 @@ RemBotClawBot/
 | [`scripts/forgejo-ci-setup.sh`](scripts/forgejo-ci-setup.sh) | End-to-end Forgejo Actions + manual runner bootstrapper. | Enables runners, seeds workflows, installs hooks, and summarizes next steps. |
 | [`scripts/generate-health-report.sh`](scripts/generate-health-report.sh) | Multi-format report exporter + webhook notifier. | Produces JSON/HTML/text health artifacts with retention + optional alerts. |
 | [`examples/openclaw_api_example.py`](examples/openclaw_api_example.py) | Programmatic interface to OpenClaw CLI and infra probes. | Emits JSON and narrative reports for dashboards. |
+| [`examples/automated-daily-check.sh`](examples/automated-daily-check.sh) | Complete daily automation example combining all scripts. | Shows orchestration patterns for production monitoring. |
 
 Detailed usage, cron snippets, and prerequisites live in [`docs/automation.md`](docs/automation.md).
 
