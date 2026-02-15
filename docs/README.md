@@ -8,6 +8,7 @@ Welcome to the RemBotClawBot knowledge base. Each document expands on an aspect 
 | `automation.md` | Details all automation scripts and examples, including usage instructions and cron integrations. |
 | `operations-playbook.md` | Day-to-day procedures, heartbeat cadence, incident response, and communication guidelines. |
 | `security-hardening.md` | Firewall, reverse proxy, and TLS automation for perimeter defense. |
+| `monitoring.md` | Observability strategy, report pipeline, dashboards, and alerting patterns. |
 
 ## How to Use This Folder
 

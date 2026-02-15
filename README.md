@@ -72,7 +72,9 @@
 | `CONTRIBUTING.md` | Collaboration guidelines + code standards. |
 | `scripts/` | Operational automation (`health-check.sh`, `git-server-backup.sh`, `monitor-openclaw.sh`). |
 | `examples/` | Reference implementations (`openclaw_api_example.py`). |
+| `examples/github-actions-workflow.yml` | Opinionated GitHub Actions blueprint for infra-heavy repos. |
 | `docs/` | Deep dives: architecture, automation, operations playbook. |
+| `reports/` | Timestamped health exports generated via `scripts/generate-health-report.sh`. |
 | `.github/workflows/ci.yml` | GitHub Actions pipeline (syntax, lint, docs, security gates). |
 
 See [`docs/README.md`](docs/README.md) for the documentation index.
@@ -110,21 +112,25 @@ source .venv/bin/activate
 # Install dependencies
 pip install psutil requests
 
-# Run monitoring script
-python3 examples/openclaw_api_example.py --health --report --json > health-report.json
+# Run monitoring script (JSON)
+python3 examples/openclaw_api_example.py --health --json > health-report.json
 
-# Or generate HTML report
+# Or generate HTML dashboard
 python3 examples/openclaw_api_example.py --health --html > health-report.html
 ```
 
-### Docker Quick Test
+### Automated Report Export
 ```bash
-# Build and run the health check container
-docker build -t rembot-healthcheck -f Dockerfile.healthcheck .
-docker run --rm rembot-healthcheck
+# Generate JSON + HTML + text reports into ./reports (default retention 14 days)
+./scripts/generate-health-report.sh
 
-# Or test in development
-docker-compose -f docker-compose.test.yml up
+# Custom output directory and Slack webhook
+OUTPUT_DIR=/var/reports WEBHOOK_URL=https://hooks.slack.com/... \
+  ./scripts/generate-health-report.sh -f json,html
+
+# Run from cron (every 2 hours)
+0 */2 * * * /opt/rembot/scripts/generate-health-report.sh -o /opt/rembot/reports \
+  >> /var/log/rembot-health.log 2>&1
 ```
 
 > **Pro Tip:** For production deployments, use the provided Ansible playbooks or Terraform configurations in the `infra/` directory.
@@ -137,6 +143,7 @@ docker-compose -f docker-compose.test.yml up
 | [`scripts/git-server-backup.sh`](scripts/git-server-backup.sh) | Forgejo/Gitea snapshot with retention + integrity verification. | Generates human-readable reports after each run. |
 | [`scripts/monitor-openclaw.sh`](scripts/monitor-openclaw.sh) | Daemon-aware watchdog with optional auto-restart + alerting hooks. | Schedules heartbeat loops, port probes, and disk/mem guards. |
 | [`scripts/forgejo-ci-setup.sh`](scripts/forgejo-ci-setup.sh) | End-to-end Forgejo Actions + manual runner bootstrapper. | Enables runners, seeds workflows, installs hooks, and summarizes next steps. |
+| [`scripts/generate-health-report.sh`](scripts/generate-health-report.sh) | Multi-format report exporter + webhook notifier. | Produces JSON/HTML/text health artifacts with retention + optional alerts. |
 | [`examples/openclaw_api_example.py`](examples/openclaw_api_example.py) | Programmatic interface to OpenClaw CLI and infra probes. | Emits JSON and narrative reports for dashboards. |
 
 Detailed usage, cron snippets, and prerequisites live in [`docs/automation.md`](docs/automation.md).
@@ -282,6 +289,11 @@ GitHub Actions workflow lives at [`.github/workflows/ci.yml`](.github/workflows/
 - Documentation structure audits (README/CONTRIBUTING required, ToC detection)
 - Secret scanning and permission hygiene
 
+Need a turnkey pipeline? Start from [`examples/github-actions-workflow.yml`](examples/github-actions-workflow.yml) — it includes:
+- Dedicated security, quality, infrastructure, build, deploy, docs, and perf-monitor jobs
+- Trivy/Bandit/ShellCheck scans, Terraform/Ansible/Kubernetes validation, Docker buildx packaging
+- Slack notifications, SSH deploy stage, and performance benchmarking harness
+
 > Extend the workflow with deployment jobs or matrix testing by adding new jobs to the YAML. The pipeline is optimized for infrastructure-heavy repos with mixed shell/Python tooling.
 
 ## 🏢 Enterprise Projects
@@ -326,9 +338,12 @@ Operational hardening details live in [`docs/operations-playbook.md`](docs/opera
 | [`docs/automation.md`](docs/automation.md) | Script usage, cron recipes, dependencies. |
 | [`docs/operations-playbook.md`](docs/operations-playbook.md) | Heartbeat cadence, incident response, comms protocol. |
 | [`docs/security-hardening.md`](docs/security-hardening.md) | Firewall, reverse proxy, and TLS automation guidance. |
+| [`docs/monitoring.md`](docs/monitoring.md) | Observability pipeline, dashboards, alerting strategy. |
 | [`docs/README.md`](docs/README.md) | Index + contribution guidance. |
 
 ## 📊 Metrics & Monitoring Dashboard
+
+*Deep dive: [`docs/monitoring.md`](docs/monitoring.md)*
 
 ### Real-Time Monitoring
 ```bash

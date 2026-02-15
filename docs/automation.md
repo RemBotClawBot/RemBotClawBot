@@ -6,14 +6,16 @@ This document explains the automation assets included in the RemBotClawBot repos
 
 ```
 scripts/
-├─ health-check.sh         # Comprehensive infrastructure + security probe
-├─ git-server-backup.sh    # Forgejo/Gitea snapshot utility with retention
-├─ monitor-openclaw.sh     # Watchdog that restarts OpenClaw + services
-├─ forgejo-ci-setup.sh     # End-to-end Forgejo Actions + manual CI bootstrapper
-├─ secure-firewall.sh      # UFW + Fail2Ban hardening with reporting
+├─ health-check.sh            # Comprehensive infrastructure + security probe
+├─ git-server-backup.sh       # Forgejo/Gitea snapshot utility with retention
+├─ monitor-openclaw.sh        # Watchdog that restarts OpenClaw + services
+├─ forgejo-ci-setup.sh        # End-to-end Forgejo Actions + manual CI bootstrapper
+├─ secure-firewall.sh         # UFW + Fail2Ban hardening with reporting
+└─ generate-health-report.sh  # Multi-format health exporter + webhook notifier
 examples/
-├─ openclaw_api_example.py # Python client for querying OpenClaw + infra
-└─ secure-reverse-proxy.yml# IaC template + scripts for hardened Nginx
+├─ openclaw_api_example.py    # Python client for querying OpenClaw + infra
+├─ secure-reverse-proxy.yml   # IaC template + scripts for hardened Nginx
+└─ github-actions-workflow.yml# Opinionated GitHub Actions pipeline blueprint
 ```
 
 ## 2. `health-check.sh`
@@ -142,11 +144,13 @@ sudo SSH_PORT=2222 ./scripts/secure-firewall.sh
 - Wraps the `openclaw` CLI with a typed client.
 - Fetches status, gateway state, cron info, and health checks.
 - Performs socket checks for Forgejo/Gitea, disk/memory inspection via `shutil` + `psutil`.
-- Generates JSON output or human-readable summaries.
+- Generates JSON output or human-readable summaries (text + HTML dashboards).
 
 ### Usage
 ```bash
 python3 examples/openclaw_api_example.py --health --report
+python3 examples/openclaw_api_example.py --health --json > health.json
+python3 examples/openclaw_api_example.py --health --html > health.html
 python3 examples/openclaw_api_example.py --status
 python3 examples/openclaw_api_example.py --git
 ```
@@ -155,7 +159,41 @@ python3 examples/openclaw_api_example.py --git
 - Python 3.10+
 - `psutil` (`pip install psutil`)
 
-## 8. `examples/secure-reverse-proxy.yml`
+## 8. `generate-health-report.sh`
+
+**Purpose:** Wrapper that automates multi-format exports (JSON/HTML/text) from `openclaw_api_example.py`, applies retention, and pushes optional webhook summaries.
+
+### Highlights
+- Generates timestamped artifacts under `reports/` (or custom directory).
+- Supports configurable format list, retention period, and webhook endpoint.
+- Validates Python dependencies and gracefully handles missing modules.
+- Parses JSON output to send Slack/Discord-friendly payloads.
+
+### Usage
+```bash
+# Default (JSON + HTML + text)
+./scripts/generate-health-report.sh
+
+# Custom directory + Slack webhook
+OUTPUT_DIR=/var/reports WEBHOOK_URL=https://hooks.slack.com/... \
+  ./scripts/generate-health-report.sh -f json,html
+
+# Cron (every 2 hours)
+0 */2 * * * /opt/rembot/scripts/generate-health-report.sh \
+  -o /opt/rembot/reports -f json,html >> /var/log/rembot-health.log 2>&1
+```
+
+### Environment Variables & Flags
+| Name | Description |
+|------|-------------|
+| `OUTPUT_DIR` / `-o` | Destination for generated reports (default: `./reports`). |
+| `FORMATS` / `-f` | Comma-separated list (`json,html,text`). |
+| `RETENTION_DAYS` / `-r` | Automatically deletes reports older than N days (default 14). |
+| `WEBHOOK_URL` / `-w` | Optional JSON webhook endpoint for summaries. |
+| `PYTHON_BIN` | Alternate Python interpreter (default `python3`). |
+| `VERBOSE=0` / `-q` | Quiet mode (only errors printed). |
+
+## 9. `examples/secure-reverse-proxy.yml`
 
 **Purpose:** Turn-key Infrastructure-as-Code bundle that provisions a hardened Nginx reverse proxy, automated Let's Encrypt certificates, and a follow-on hardening routine.
 
@@ -170,7 +208,35 @@ python3 examples/openclaw_api_example.py --git
 3. Execute the hardening script to apply global defense-in-depth controls.
 4. Validate with `nginx -t && systemctl reload nginx`.
 
-## 9. Operational Recommendations
+## 10. `examples/github-actions-workflow.yml`
+
+**Purpose:** Comprehensive CI/CD blueprint covering security scans, lint/test stages, infrastructure validation, container builds, SSH deployments, documentation linting, and performance benchmarking.
+
+### Job Graph
+1. **security** – Trivy, Bandit, and ShellCheck against repo.
+2. **quality** – Python + shell tests, code formatting, coverage uploads.
+3. **infrastructure** – Ansible, Terraform, Dockerfile, and Kubernetes validation.
+4. **build** – Multi-arch Docker Buildx with OCI metadata + artifact packaging.
+5. **deploy** – SSH-based rollout with post-deploy health verification + Slack alerts.
+6. **docs** – Markdown lint/link checking + Pandoc HTML rendering.
+7. **perf-monitor** – Lightweight benchmark + report artifact.
+
+### Usage
+```yaml
+# .github/workflows/ci.yml
+name: CI
+on: [push, pull_request]
+
+jobs:
+  security:
+    uses: ./.github/actions/security.yml   # Or inline steps from the example
+```
+
+1. Copy the example file into `.github/workflows/ci.yml` (or reference sections).  
+2. Replace placeholder secrets (`PRODUCTION_HOST`, `DOCKER_USERNAME`, Slack webhook).  
+3. Toggle jobs via `needs` graph to suit staging vs production.
+
+## 11. Operational Recommendations
 
 1. **Version Control:** Keep scripts in git to track changes and facilitate code review.
 2. **Permissions:** Run operational scripts with least privilege possible; consider dedicated service accounts.
@@ -179,7 +245,7 @@ python3 examples/openclaw_api_example.py --git
 5. **Dry Runs:** Test backup restores periodically to ensure integrity.
 6. **IaC Parity:** Keep shell automations paired with Nginx/firewall templates so environments stay reproducible.
 
-## 10. Roadmap
+## 12. Roadmap
 
 - Add Ansible playbooks wrapping the shell scripts for wider rollout.
 - Expand health checks to include Prometheus endpoint probing and SSL expiry monitoring.
